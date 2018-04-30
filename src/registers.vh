@@ -1,0 +1,3 @@
+`define REG_DEBUG_MEM_ADDR 0
+`define REG_DEBUG_MEM_DATA 1
+`define REG_DEBUG_MEM_STATUS 2
