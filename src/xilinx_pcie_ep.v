@@ -29,10 +29,10 @@ module xilinx_pcie_ep #(
     output reg [15:0] req_rid,
     output reg [7:0] req_tag,
     output reg [7:0] req_be,
-    output reg [12:0] req_addr,
+    output reg [31:0] req_addr,
 
     // Memory Write
-    output reg [10:0]  wr_addr,
+    output reg [31:0]  wr_addr,
     output reg [7:0]   wr_be,
     output reg [31:0]  wr_data,
     output reg         wr_en,
@@ -72,7 +72,7 @@ wire sof_right = !m_axis_rx_tuser[13] && sof_present;
 wire sof_mid = m_axis_rx_tuser[13] && sof_present;
 
 //registers
-reg [lp_state_bits-1:0] rx_state;
+(* dont_touch = "true" *) reg [lp_state_bits-1:0] rx_state;
 reg [7:0] tlp_type;
 
 //comb registers
@@ -91,44 +91,17 @@ reg [9:0] req_len_next;
 reg [15:0] req_rid_next;
 reg [7:0] req_tag_next;
 reg [7:0] req_be_next;
-reg [12:0] req_addr_next;
+reg [31:0] req_addr_next;
 
-reg [10:0]  wr_addr_next;
+reg [31:0]  wr_addr_next;
 reg [7:0]   wr_be_next;
 reg [31:0]  wr_data_next;
 reg         wr_en_next;
 
-assign    mem64_bar_hit_n = 1'b1;
-assign    io_bar_hit_n = 1'b1;
-assign    mem32_bar_hit_n = ~(m_axis_rx_tuser[2]);
-assign    erom_bar_hit_n  = ~(m_axis_rx_tuser[8]);
-
-reg [1:0] region_select;
-always @(*) begin
-  case ({io_bar_hit_n, mem32_bar_hit_n, mem64_bar_hit_n, erom_bar_hit_n})
-
-    4'b0111 : begin
-      region_select <= 2'b00;    // Select IO region
-    end // 4'b0111
-
-    4'b1011 : begin
-      region_select <= 2'b01;    // Select Mem32 region
-    end // 4'b1011
-
-    4'b1101 : begin
-      region_select <= 2'b10;    // Select Mem64 region
-    end // 4'b1101
-
-    4'b1110 : begin
-      region_select <= 2'b11;    // Select EROM region
-    end // 4'b1110
-
-    default : begin
-      region_select <= 2'b00;    // Error selection will select IO region
-    end // default
-
-  endcase // case ({io_bar_hit_n, mem32_bar_hit_n, mem64_bar_hit_n, erom_bar_hit_n})
-end
+wire mem64_bar_hit_n = 1'b1;
+wire io_bar_hit_n = 1'b1;
+wire mem32_bar_hit_n = ~(m_axis_rx_tuser[2]);
+wire erom_bar_hit_n  = ~(m_axis_rx_tuser[8]);
 
 //comb logic state_next
 always @ ( * ) begin
@@ -323,12 +296,19 @@ always @ ( * ) begin
             if ((m_axis_rx_tvalid) && (m_axis_rx_tready)) begin
                 if(sof_mid) begin
                     m_axis_rx_tready_next = 1'b0;
+                    case (m_axis_rx_tdata[94:88])
+                        RX_MEM_WR32_FMT_TYPE: begin
+                            if (m_axis_rx_tdata[73:64] == 10'b1) begin
+                                wr_be_next = m_axis_rx_tdata[103:96];
+                            end
+                        end
+                    endcase
                 end else if(sof_right) begin
                     m_axis_rx_tready_next = 1'b0;
                     case (m_axis_rx_tdata[30:24])
                             RX_MEM_RD32_FMT_TYPE: begin
                                     if (m_axis_rx_tdata[9:0] == 10'b1) begin
-                                            req_addr_next = m_axis_rx_tdata[78:66];
+                                            req_addr_next = m_axis_rx_tdata[97:64];
                                             req_compl_next = 1;
                                             req_compl_wd_next = 1;
                                     end
@@ -337,7 +317,7 @@ always @ ( * ) begin
                                     if (m_axis_rx_tdata[9:0] == 10'b1) begin
                                             wr_be_next = m_axis_rx_tdata[39:32];
                                             wr_data_next = m_axis_rx_tdata[127:96];
-                                            wr_addr_next = m_axis_rx_tdata[78:66];
+                                            wr_addr_next = m_axis_rx_tdata[97:64];
                                             wr_en_next = 1'b1;
                                     end
                             end
@@ -349,7 +329,7 @@ always @ ( * ) begin
         lp_state_rx_mem_rd32_dw1dw2: begin
                 if(m_axis_rx_tvalid) begin
                         m_axis_rx_tready_next = 1'b0;
-                        req_addr_next = m_axis_rx_tdata[14:2];
+                        req_addr_next = m_axis_rx_tdata[31:0];
                         req_compl_next = 1;
                         req_compl_wd_next = 1;
                 end
@@ -359,7 +339,7 @@ always @ ( * ) begin
                 if(m_axis_rx_tvalid) begin
                         m_axis_rx_tready_next = 1'b0;
                         wr_data_next = m_axis_rx_tdata[63:32];
-                        wr_addr_next = m_axis_rx_tdata[14:2];
+                        wr_addr_next = m_axis_rx_tdata[31:0];
                         wr_en_next = 1'b1;
                 end
         end
@@ -431,10 +411,8 @@ begin
     lp_state_rst                        : state_ascii <= "lp_state_rst";
     lp_state_rx_mem_rd32_dw1dw2         : state_ascii <= "lp_state_rx_mem_rd32_dw1dw2";
     lp_state_rx_mem_wr32_dw1dw2         : state_ascii <= "lp_state_rx_mem_wr32_dw1dw2";
-    lp_state_rx_wait                    : state_ascii <=  "lp_state_rx_wait";
-
+    lp_state_rx_wait                    : state_ascii <= "lp_state_rx_wait";
   endcase
-
 end
 // synthesis translate_on
 

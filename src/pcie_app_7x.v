@@ -142,7 +142,20 @@ module  pcie_app_7x#(
   output                        cfg_interrupt_assert,
   output [7:0]                  cfg_interrupt_di,
   output                        cfg_interrupt_stat,
-  output  [4:0]                 cfg_pciecap_interrupt_msgnum
+  output  [4:0]                 cfg_pciecap_interrupt_msgnum,
+  
+  
+  output wire [31:0]            rd_addr,
+  output wire [7:0]             rd_be,
+  input wire [31:0]             rd_data,
+  output wire                   rd_en,
+  input wire                    rd_done,
+  
+  output wire [31:0]            wr_addr,
+  output wire [7:0]             wr_be,
+  output wire [31:0]            wr_data,
+  output wire                   wr_en,
+  input wire                    wr_done
 );
   //----------------------------------------------------------------------------------------------------------------//
   // PCIe Block EP Tieoffs - Example PIO doesn't support the following inputs                                       //
@@ -247,8 +260,19 @@ module  pcie_app_7x#(
     .m_axis_rx_tlast ( m_axis_rx_tlast ),           // I
     .m_axis_rx_tvalid( m_axis_rx_tvalid ),          // I
     .m_axis_rx_tready( m_axis_rx_tready ),          // O
-    .m_axis_rx_tuser ( m_axis_rx_tuser )            // I
-
+    .m_axis_rx_tuser ( m_axis_rx_tuser ),            // I
+    
+    .rd_addr(rd_addr),
+    .rd_be(rd_be),
+    .rd_data(rd_data),
+    .rd_en(rd_en),
+    .rd_done(rd_done),
+    
+    .wr_addr(wr_addr),
+    .wr_be(wr_be),
+    .wr_data(wr_data),
+    .wr_en(wr_en),
+    .wr_done(wr_done)
   );
 
 endmodule // pcie_app
