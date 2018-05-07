@@ -95,26 +95,30 @@ module PIO #(
   output                        cfg_turnoff_ok,
 
   input [15:0]                  cfg_completer_id,
-  
+
+  output wire                   rd_en,
+  input wire                    rd_done,
   output wire [31:0]            rd_addr,
   output wire [7:0]             rd_be,
   input wire [31:0]             rd_data,
-  output wire                   rd_en,
-  input wire                    rd_done,
-  
+
+  output wire                   wr_en,
+  input wire                    wr_done,
   output wire [31:0]            wr_addr,
   output wire [7:0]             wr_be,
-  output wire [31:0]            wr_data,
-  output wire                   wr_en,
-  input wire                    wr_done
+  output wire [31:0]            wr_data
 ); // synthesis syn_hier = "hard"
 
   // Local wires
-
   wire          req_compl;
   wire          req_compl_wd;
   wire          compl_done;
   reg           pio_reset_n;
+
+
+  assign rd_be = 8'h0F;
+  assign rd_en = req_compl;
+
 
   always @(posedge user_clk) begin
     if (user_reset)
@@ -166,14 +170,14 @@ xilinx_pcie_ep xilinx_pcie_ep_inst (
     .req_compl(req_compl),
     .req_compl_wd(req_compl_wd),
 
-    .compl_done(compl_done),
-    .wr_busy(1'b0),
-    
+    .compl_done(rd_done),
+    .wr_done(wr_done),
+
     .wr_addr(wr_addr),
     .wr_be(wr_be),
     .wr_data(wr_data),
     .wr_en(wr_en)
-    
+
     );
 
 xilinx_pcie_completer xilinx_pcie_completer_inst (
@@ -187,8 +191,8 @@ xilinx_pcie_completer xilinx_pcie_completer_inst (
     .s_axis_tx_tvalid(s_axis_tx_tvalid),
     .tx_src_dsc(tx_src_dsc),
 
-    .req_compl(req_compl),
-    .req_compl_wd(req_compl_wd),
+    .req_compl(rd_done),
+    .req_compl_wd(rd_done),
     .compl_done(compl_done),
 
     .req_tc(req_tc),
@@ -251,7 +255,7 @@ xilinx_pcie_completer xilinx_pcie_completer_inst (
     .clk( user_clk ),                       // I
     .rst_n( pio_reset_n ),                  // I
 
-    .req_compl( req_compl ),                // I
+    .req_compl( rd_done ),                // I
     .compl_done( compl_done ),              // I
 
     .cfg_to_turnoff( cfg_to_turnoff ),      // I

@@ -87,8 +87,10 @@ always @(posedge i_clk) begin
 reg [6:0] lower_addr;
 reg hold_state;
 reg req_compl_q;
+reg [31:0] rd_data_q;
 reg req_compl_wd_q;
 reg req_compl_q2;
+reg [31:0] rd_data_q2;
 reg req_compl_wd_q2;
 
 wire compl_wd = req_compl_wd_q2;
@@ -113,6 +115,7 @@ always @ ( posedge i_clk ) begin
   end // if !rst_n
   else
   begin
+    rd_data_q <= rd_data;
     req_compl_q      <= req_compl;
     req_compl_wd_q   <= req_compl_wd;
   end // if rst_n
@@ -126,6 +129,7 @@ always @ ( posedge i_clk ) begin
   end // if (!rst_n )
   else
   begin
+    rd_data_q2 <= rd_data_q;
     req_compl_q2      <=  req_compl_q;
     req_compl_wd_q2   <=  req_compl_wd_q;
   end // if (rst_n )
@@ -145,7 +149,7 @@ always @ ( posedge i_clk ) begin
                         s_axis_tx_tlast   <=  1'b1;
                         s_axis_tx_tvalid  <=  1'b1;
                         s_axis_tx_tdata   <=  {                   // Bits
-                                            rd_data,                  // 32
+                                            rd_data_q2,                  // 32
                                             req_rid,                  // 16
                                             req_tag,                  //  8
                                             {1'b0},                   //  1

@@ -41,7 +41,7 @@ xilinx_pcie_ep xilinx_pcie_ep_inst (
     .req_compl_wd(req_compl_wd),
 
     .compl_done(compl_done),
-    .wr_busy(1'b0)
+    .wr_done(1'b1)
     );
 
 xilinx_pcie_completer xilinx_pcie_completer_inst (

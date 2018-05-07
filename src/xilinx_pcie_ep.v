@@ -10,40 +10,43 @@
 module xilinx_pcie_ep #(
     parameter P_DATA_WIDTH = 128
     )(
-    input wire i_clk,
-    input wire i_rst_n,
+    input wire          i_clk,
+    input wire          i_rst_n,
     //Configuration interface
-    input wire [2:0] cfg_max_read_request_size,
-    input wire [2:9] cfg_max_payload_size,
+    input wire [2:0]    cfg_max_read_request_size,
+    input wire [2:9]    cfg_max_payload_size,
 
     // Memory read compleation
-    output reg         req_compl,
-    output reg         req_compl_wd,
-    input wire         compl_done,
+    output reg          req_compl,
+    output reg          req_compl_wd,
+    input wire          compl_done,
 
-    output reg [2:0] req_tc,
-    output reg req_td,
-    output reg req_ep,
-    output reg [1:0] req_attr,
-    output reg [9:0] req_len,
-    output reg [15:0] req_rid,
-    output reg [7:0] req_tag,
-    output reg [7:0] req_be,
-    output reg [31:0] req_addr,
+    output reg [2:0]    req_tc,
+    output reg          req_td,
+    output reg          req_ep,
+    output reg [1:0]    req_attr,
+    output reg [9:0]    req_len,
+    output reg [15:0]   req_rid,
+    output reg [7:0]    req_tag,
+    output reg [7:0]    req_be,
+    output reg [31:0]   req_addr,
 
+    // Memory Read
+    output reg [7:0]    rd_be,
+    output reg          rd_en,
     // Memory Write
-    output reg [31:0]  wr_addr,
-    output reg [7:0]   wr_be,
-    output reg [31:0]  wr_data,
-    output reg         wr_en,
-    input wr_busy,
+    output reg [31:0]   wr_addr,
+    output reg [7:0]    wr_be,
+    output reg [31:0]   wr_data,
+    output reg          wr_en,
+    input wire          wr_done,
 
     //Receive interface signals
-    input wire m_axis_rx_tlast,
+    input wire          m_axis_rx_tlast,
     input wire [P_DATA_WIDTH-1:0] m_axis_rx_tdata,
-    input wire [21:0] m_axis_rx_tuser,
-    input wire m_axis_rx_tvalid,
-    output reg m_axis_rx_tready
+    input wire [21:0]   m_axis_rx_tuser,
+    input wire          m_axis_rx_tvalid,
+    output reg          m_axis_rx_tready
     );
 
 localparam
@@ -254,13 +257,13 @@ always @ ( * ) begin
         end
 
         lp_state_rx_wait: begin
-                if ((tlp_type == RX_MEM_WR32_FMT_TYPE) &&(!wr_busy)) begin
+                if ((tlp_type == RX_MEM_WR32_FMT_TYPE) && (wr_done)) begin
                   rx_state_next =  lp_state_rst;
                 end // if ((tlp_type == RX_MEM_WR32_FMT_TYPE) &&(!wr_busy))
-                else if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (!wr_busy)) begin
+                else if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (wr_done)) begin
                   rx_state_next =  lp_state_rst;
                 end // if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (!compl_done))
-                else if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (!wr_busy)) begin
+                else if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (wr_done)) begin
                   rx_state_next =  lp_state_rst;
                 end // if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (!wr_busy))
                 else if ((tlp_type == RX_MEM_RD32_FMT_TYPE) && (compl_done)) begin
@@ -345,13 +348,13 @@ always @ ( * ) begin
         end
 
         lp_state_rx_wait: begin
-                if ((tlp_type == RX_MEM_WR32_FMT_TYPE) &&(!wr_busy)) begin
+                if ((tlp_type == RX_MEM_WR32_FMT_TYPE) && (wr_done)) begin
                   m_axis_rx_tready_next  =  1'b1;
                 end // if ((tlp_type == RX_MEM_WR32_FMT_TYPE) &&(!wr_busy))
-                else if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (!wr_busy)) begin
+                else if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (wr_done)) begin
                   m_axis_rx_tready_next =  1'b1;
                 end // if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (!compl_done))
-                else if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (!wr_busy)) begin
+                else if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (wr_done)) begin
                   m_axis_rx_tready_next =  1'b1;
                 end // if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (!wr_busy))
                 else if ((tlp_type == RX_MEM_RD32_FMT_TYPE) && (compl_done)) begin
