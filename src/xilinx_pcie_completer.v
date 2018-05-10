@@ -22,7 +22,6 @@ module xilinx_pcie_completer #(
     output  reg                     s_axis_tx_tvalid,
     output  wire                    tx_src_dsc,
 
-
     input wire          req_compl,
     input wire          req_compl_wd,
     output reg          compl_done,

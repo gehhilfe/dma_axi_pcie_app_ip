@@ -180,9 +180,9 @@ xilinx_pcie_ep xilinx_pcie_ep_inst (
 
     );
 
-xilinx_pcie_completer xilinx_pcie_completer_inst (
+xilinx_pcie_rx xilinx_pcie_completer_inst (
     .i_clk(user_clk),
-    .i_rst_n(user_reset),
+    .i_rst(user_reset),
 
     .s_axis_tx_tready(s_axis_tx_tready),
     .s_axis_tx_tdata(s_axis_tx_tdata),
