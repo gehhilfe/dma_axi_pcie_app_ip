@@ -177,7 +177,7 @@ always @ ( * ) begin
                             end
                         end
 */
-                        default: $display("Unsuporrted FMT TYPE in module xilinx_pcie_ep\n");
+                        default: $display("Unsuporrted FMT TYPE=%x in module xilinx_pcie_ep",m_axis_rx_tdata[94:88]);
                     endcase
                 end
                 //TLP start on right
@@ -234,7 +234,7 @@ always @ ( * ) begin
                             end
                         end
 */
-                        default: $display("Unsuporrted FMT TYPE in module xilinx_pcie_ep\n");
+                        default: $display("Unsuporrted FMT TYPE=%x in module xilinx_pcie_ep",m_axis_rx_tdata[30:24]);
                     endcase
                 end
             end

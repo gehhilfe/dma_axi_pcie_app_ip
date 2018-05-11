@@ -36,6 +36,12 @@ module xilinx_pcie_rx #(
     output  wire                    tx_src_dsc,
     
 
+    // DMA Read request intf
+    input wire [31:0] dma_read_addr,
+    input wire [9:0] dma_read_len,
+    input wire dma_read_valid,
+    output reg dma_read_done,
+
     input wire          req_compl,
     input wire          req_compl_wd,
     output reg          compl_done,
@@ -63,6 +69,7 @@ assign tx_src_dsc = 1'b0;
 
 localparam PIO_CPLD_FMT_TYPE      = 7'b10_01010;
 localparam PIO_CPL_FMT_TYPE       = 7'b00_01010;
+localparam FMT_TYPE_READ_REQUEST  = 7'b00_00000;
 
 reg [6:0] lower_addr;
 always @ (rd_be or req_addr or req_compl_wd) begin
@@ -99,7 +106,7 @@ end
 localparam 
     lp_state_bits = 32,
     lp_state_idle = 0,
-    lp_state_completion = 1,
+    lp_state_fin = 1,
     lp_state_wait_ready = 2;
 
 
@@ -107,25 +114,35 @@ reg [lp_state_bits-1:0] state, state_next, state_after_ready, state_after_ready_
 
 reg set_read_completion_with_data;
 reg set_read_completion_without_data;
+reg set_dma_read_request;
 reg reset_valid;
+reg [7:0] next_free_tag;
+reg incr_tag;
+
 always @(*) begin
     state_next = state;
     set_read_completion_with_data = 0;
+    set_dma_read_request = 0;
     set_read_completion_without_data = 0;
     reset_valid = 0;
-
+    incr_tag = 0;
+    
     case(state)
         lp_state_idle: begin
             if(req_compl) begin
-                state_next = lp_state_completion;
+                state_next = lp_state_fin;
                 if(req_compl_wd)
                     set_read_completion_with_data = 1;
                 else
                     set_read_completion_without_data = 1;
+            end else if(dma_read_valid) begin
+                state_next = lp_state_fin;
+                set_dma_read_request = 1;
+                incr_tag = 1;
             end
         end
 
-        lp_state_completion: begin
+        lp_state_fin: begin
             if (s_axis_tx_tready) begin
                 reset_valid = 1;
                 state_next = lp_state_idle;
@@ -178,19 +195,55 @@ function [P_DATA_WIDTH-1:0] tlp_header_completion;
     end
 endfunction
 
+function [P_DATA_WIDTH-1:0] tlp_header_read_request;
+    input [31:0] addr;
+    input [9:0] len;
+    input [7:0] tag;
+    input [15:0] completer_id;
+    begin
+        tlp_header_read_request = {
+                {32'b0},                // 32 // DW 4
+                
+                addr[31:2],             // 30 // DW 3
+                {2'b0},                 //  2
+
+                completer_id,           // 16 // DW 1
+                tag,                    // 8
+                {4'b0},                 //  4
+                {4'hf},                 //  4
+
+                {1'b0},                 //  1 // DW 0
+                FMT_TYPE_READ_REQUEST,  //  7 //
+                {1'b0},                 //  1 //
+                {3'b0},                 //  3 //
+                {4'b0},                 //  4 //
+                {1'b0},                 //  1 //
+                {1'b0},                 //  1 //
+                {2'b0},                 //  2 //
+                {2'b0},                 //  2 //
+                len                     // 10 //
+        };
+    end
+endfunction
+
 always @(posedge i_clk) begin
     if (i_rst) begin
         state <= lp_state_idle;
         s_axis_tx_tvalid <= 0;
         compl_done  <= 0;
+        dma_read_done <= 0;
+        next_free_tag <= 0;
     end
     else begin
         state <= state_next;
         state_after_ready <= state_after_ready_next;
 
+        if (incr_tag) next_free_tag <= next_free_tag + 1'b1;
+
         if (reset_valid) begin
             s_axis_tx_tvalid  <=  1'b0;
             compl_done <= 0;
+            dma_read_done <= 0;
         end else if (set_read_completion_with_data || set_read_completion_without_data) begin
             s_axis_tx_tdata <= tlp_header_completion(
                     (set_read_completion_without_data)?PIO_CPL_FMT_TYPE:PIO_CPLD_FMT_TYPE,
@@ -216,6 +269,17 @@ always @(posedge i_clk) begin
             s_axis_tx_tvalid  <=  1'b1;
             compl_done <= 1;
         end // set_read_completion
+        else if (set_dma_read_request) begin
+            s_axis_tx_tdata <= tlp_header_read_request (
+                    dma_read_addr,
+                    dma_read_len[9:0],
+                    next_free_tag,
+                    completer_id
+                );
+            s_axis_tx_tkeep   <=  16'h0FFF;
+            s_axis_tx_tvalid  <=  1'b1;
+            dma_read_done <= 1;
+        end // set_dma_read_request
     end
 end
 

@@ -180,6 +180,14 @@ xilinx_pcie_ep xilinx_pcie_ep_inst (
 
     );
 
+localparam lp_dma_delay = 1024;
+reg [lp_dma_delay:0] dma_valid;
+
+always @(posedge user_clk) begin
+    dma_valid[0] <= compl_done;
+    dma_valid[lp_dma_delay:1] <= dma_valid[lp_dma_delay-1:0];
+end
+
 xilinx_pcie_rx xilinx_pcie_completer_inst (
     .i_clk(user_clk),
     .i_rst(user_reset),
@@ -207,7 +215,12 @@ xilinx_pcie_rx xilinx_pcie_completer_inst (
 
     .completer_id(cfg_completer_id),
     .rd_addr(rd_addr),
-    .rd_data(rd_data)
+    .rd_data(rd_data),
+    
+    
+    .dma_read_addr(32'h0),
+    .dma_read_len(32'd128),
+    .dma_read_valid(dma_valid[lp_dma_delay])
 );
 
 
