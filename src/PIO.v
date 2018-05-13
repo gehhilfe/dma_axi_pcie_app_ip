@@ -106,7 +106,19 @@ module PIO #(
   input wire                    wr_done,
   output wire [31:0]            wr_addr,
   output wire [7:0]             wr_be,
-  output wire [31:0]            wr_data
+  output wire [31:0]            wr_data,
+
+  input wire  [31:0]            dma_read_addr,
+  input wire  [9:0]             dma_read_len,
+  input wire                    dma_read_valid,
+  output wire [7:0]             current_tag,
+
+
+  output wire [7:0]             packer_tag,
+  output wire [127:0]           packer_dout,
+  output wire [3:0]             packer_dout_dwen,
+  output wire                   packer_valid,
+  output wire                   packer_done
 ); // synthesis syn_hier = "hard"
 
   // Local wires
@@ -144,6 +156,15 @@ wire [7:0]      req_tag;
 wire [7:0]      req_be;
 wire [31:0]     req_addr;
 
+
+assign packer_tag = req_tag;
+
+// Packer
+wire [127:0]  packer_ep_dout;
+wire [1:0]    packer_first_dw;
+wire          packer_ep_valid;
+wire          packer_ep_done;
+
 xilinx_pcie_ep xilinx_pcie_ep_inst (
     .i_clk(user_clk),
     .i_rst_n(user_reset),
@@ -176,17 +197,30 @@ xilinx_pcie_ep xilinx_pcie_ep_inst (
     .wr_addr(wr_addr),
     .wr_be(wr_be),
     .wr_data(wr_data),
-    .wr_en(wr_en)
+    .wr_en(wr_en),
+
+    // Packer
+    .packer_dout(packer_ep_dout),
+    .packer_first_dw(packer_first_dw),
+    .packer_valid(packer_ep_valid),
+    .packer_done(packer_ep_done)
 
     );
 
-localparam lp_dma_delay = 1024;
-reg [lp_dma_delay:0] dma_valid;
+packer dma_completion_packer (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
 
-always @(posedge user_clk) begin
-    dma_valid[0] <= compl_done;
-    dma_valid[lp_dma_delay:1] <= dma_valid[lp_dma_delay-1:0];
-end
+    .din(packer_ep_dout),
+    .first_dw(packer_first_dw),
+    .valid(packer_ep_valid),
+    .done(packer_ep_done),
+
+    .dout(packer_dout),
+    .dout_valid(packer_valid),
+    .dout_dwen(packer_dout_dwen),
+    .dout_done(packer_done)
+  );
 
 xilinx_pcie_rx xilinx_pcie_completer_inst (
     .i_clk(user_clk),
@@ -218,45 +252,11 @@ xilinx_pcie_rx xilinx_pcie_completer_inst (
     .rd_data(rd_data),
     
     
-    .dma_read_addr(32'h0),
-    .dma_read_len(32'd128),
-    .dma_read_valid(dma_valid[lp_dma_delay])
+    .dma_read_addr(dma_read_addr),
+    .dma_read_len(dma_read_len),
+    .dma_read_valid(dma_read_valid),
+    .current_tag(current_tag)
 );
-
-
-  //
-  // PIO instance
-  //
-/*
-  PIO_EP  #(
-    .C_DATA_WIDTH( C_DATA_WIDTH ),
-    .KEEP_WIDTH( KEEP_WIDTH ),
-    .TCQ( TCQ )
-  ) PIO_EP_inst (
-
-    .clk( user_clk ),                             // I
-    .rst_n( pio_reset_n ),                        // I
-
-    .s_axis_tx_tready( s_axis_tx_tready ),        // I
-    .s_axis_tx_tdata( s_axis_tx_tdata ),          // O
-    .s_axis_tx_tkeep( s_axis_tx_tkeep ),          // O
-    .s_axis_tx_tlast( s_axis_tx_tlast ),          // O
-    .s_axis_tx_tvalid( s_axis_tx_tvalid ),        // O
-    .tx_src_dsc( tx_src_dsc ),                    // O
-
-    .m_axis_rx_tdata( m_axis_rx_tdata ),          // I
-    .m_axis_rx_tkeep( m_axis_rx_tkeep ),          // I
-    .m_axis_rx_tlast( m_axis_rx_tlast ),          // I
-    .m_axis_rx_tvalid( m_axis_rx_tvalid ),        // I
-    .m_axis_rx_tready( m_axis_rx_tready ),        // O
-    .m_axis_rx_tuser ( m_axis_rx_tuser ),         // I
-
-    .req_compl(req_compl),                        // O
-    .compl_done(compl_done),                      // O
-
-    .cfg_completer_id ( cfg_completer_id )        // I [15:0]
-  );
-*/
 
   //
   // Turn-Off controller

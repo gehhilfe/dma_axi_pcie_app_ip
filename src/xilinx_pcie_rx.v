@@ -37,10 +37,11 @@ module xilinx_pcie_rx #(
     
 
     // DMA Read request intf
-    input wire [31:0] dma_read_addr,
-    input wire [9:0] dma_read_len,
-    input wire dma_read_valid,
-    output reg dma_read_done,
+    input wire [31:0]   dma_read_addr,
+    input wire [9:0]    dma_read_len,
+    input wire          dma_read_valid,
+    output reg          dma_read_done,
+    output wire [7:0]   current_tag,
 
     input wire          req_compl,
     input wire          req_compl_wd,
@@ -117,6 +118,7 @@ reg set_read_completion_without_data;
 reg set_dma_read_request;
 reg reset_valid;
 reg [7:0] next_free_tag;
+assign current_tag = next_free_tag;
 reg incr_tag;
 
 always @(*) begin
@@ -172,16 +174,19 @@ function [P_DATA_WIDTH-1:0] tlp_header_completion;
     input [31:0] data;
     begin
         tlp_header_completion = {
-                data,                   // 32
-                requester_id,           // 16
+                data,                   // 32 // DW 4
+
+                requester_id,           // 16 // DW 3
                 tag,                    //  8
                 {1'b0},                 //  1
                 lower_addr,             //  7
-                completer_id,           // 16
+                
+                completer_id,           // 16 // DW 2
                 {3'b0},                 //  3
                 {1'b0},                 //  1
                 byte_count,             // 12
-                {1'b0},                 //  1
+
+                {1'b0},                 //  1 // DW 1
                 fmt_type,               //  7
                 {1'b0},                 //  1
                 tc,                     //  3

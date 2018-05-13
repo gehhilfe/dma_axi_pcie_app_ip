@@ -155,7 +155,18 @@ module  pcie_app_7x#(
   output wire [7:0]             wr_be,
   output wire [31:0]            wr_data,
   output wire                   wr_en,
-  input wire                    wr_done
+  input wire                    wr_done,
+
+  input wire  [31:0]            dma_read_addr,
+  input wire  [9:0]             dma_read_len,
+  input wire                    dma_read_valid,
+  output wire [7:0]             current_tag,
+
+  output wire [7:0]             packer_tag,
+  output wire [127:0]           packer_dout,
+  output wire [3:0]             packer_dout_dwen,
+  output wire                   packer_valid,
+  output wire                   packer_done
 );
   //----------------------------------------------------------------------------------------------------------------//
   // PCIe Block EP Tieoffs - Example PIO doesn't support the following inputs                                       //
@@ -272,7 +283,17 @@ module  pcie_app_7x#(
     .wr_be(wr_be),
     .wr_data(wr_data),
     .wr_en(wr_en),
-    .wr_done(wr_done)
+    .wr_done(wr_done),
+
+    .dma_read_addr(dma_read_addr),
+    .dma_read_len(dma_read_len),
+    .dma_read_valid(dma_read_valid),
+    .current_tag(current_tag),
+
+    .packer_dout(packer_dout),
+    .packer_valid(packer_valid),
+    .packer_dout_dwen(packer_dout_dwen),
+    .packer_done(packer_done)
   );
 
 endmodule // pcie_app
