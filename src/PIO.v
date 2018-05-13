@@ -111,6 +111,7 @@ module PIO #(
   input wire  [31:0]            dma_read_addr,
   input wire  [9:0]             dma_read_len,
   input wire                    dma_read_valid,
+  output wire                   dma_read_done,
   output wire [7:0]             current_tag,
 
 
@@ -255,6 +256,7 @@ xilinx_pcie_rx xilinx_pcie_completer_inst (
     .dma_read_addr(dma_read_addr),
     .dma_read_len(dma_read_len),
     .dma_read_valid(dma_read_valid),
+    .dma_read_done(dma_read_done),
     .current_tag(current_tag)
 );
 

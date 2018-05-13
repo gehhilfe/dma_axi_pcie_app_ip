@@ -160,6 +160,7 @@ module  pcie_app_7x#(
   input wire  [31:0]            dma_read_addr,
   input wire  [9:0]             dma_read_len,
   input wire                    dma_read_valid,
+  output wire                   dma_read_done,
   output wire [7:0]             current_tag,
 
   output wire [7:0]             packer_tag,
@@ -288,8 +289,10 @@ module  pcie_app_7x#(
     .dma_read_addr(dma_read_addr),
     .dma_read_len(dma_read_len),
     .dma_read_valid(dma_read_valid),
+    .dma_read_done(dma_read_done),
     .current_tag(current_tag),
 
+    .packer_tag(packer_tag),
     .packer_dout(packer_dout),
     .packer_valid(packer_valid),
     .packer_dout_dwen(packer_dout_dwen),
