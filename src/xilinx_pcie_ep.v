@@ -322,10 +322,6 @@ always @ ( * ) begin
                   rx_state_next =  lp_state_rst;
                   m_axis_rx_tready_next  =  1'b1;
                 end // if ((tlp_type == RX_IO_WR32_FMT_TYPE) && (!compl_done))
-                else if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (wr_done)) begin
-                  rx_state_next =  lp_state_rst;
-                  m_axis_rx_tready_next  =  1'b1;
-                end // if ((tlp_type == RX_MEM_WR64_FMT_TYPE) && (!wr_busy))
                 else if ((tlp_type == RX_MEM_RD32_FMT_TYPE) && (compl_done)) begin
                   rx_state_next =  lp_state_rst;
                   m_axis_rx_tready_next  =  1'b1;
@@ -334,10 +330,7 @@ always @ ( * ) begin
                   rx_state_next =  lp_state_rst;
                   m_axis_rx_tready_next  =  1'b1;
                 end
-                else if ((tlp_type == RX_MEM_RD64_FMT_TYPE) && (compl_done)) begin
-                  rx_state_next =  lp_state_rst;
-                  m_axis_rx_tready_next  =  1'b1;
-                end else begin
+                else begin
                   rx_state_next = lp_state_rx_wait;
                 end
         end
@@ -353,7 +346,7 @@ always @ (posedge i_clk) begin
         rx_state <= lp_state_rst;
         wr_en <= 0;
 
-        packer_valid_next <= 0;
+        packer_valid <= 0;
     end else begin
         m_axis_rx_tready <= m_axis_rx_tready_next;
         rx_state <= rx_state_next;
