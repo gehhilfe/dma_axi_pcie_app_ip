@@ -214,7 +214,7 @@ function [P_DATA_WIDTH-1:0] tlp_header_read_request;
 
                 completer_id,           // 16 // DW 1
                 tag,                    // 8
-                {4'b0},                 //  4
+                (len==1)?{4'b0}:{4'hf},                 //  4
                 {4'hf},                 //  4
 
                 {1'b0},                 //  1 // DW 0
