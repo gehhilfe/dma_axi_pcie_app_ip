@@ -12,6 +12,7 @@ module xilinx_pcie_ep #(
     )(
     input wire          i_clk,
     input wire          i_rst_n,
+    
     //Configuration interface
     input wire [2:0]    cfg_max_read_request_size,
     input wire [2:9]    cfg_max_payload_size,

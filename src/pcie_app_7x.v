@@ -94,6 +94,8 @@ module  pcie_app_7x#(
   input   [7:0]                 cfg_bus_number,
   input   [4:0]                 cfg_device_number,
   input   [2:0]                 cfg_function_number,
+  input                         cfg_interrupt_rdy,
+
   output                        tx_cfg_gnt,
   output                        cfg_pm_halt_aspm_l0s,
   output                        cfg_pm_halt_aspm_l1,
@@ -167,7 +169,12 @@ module  pcie_app_7x#(
   output wire [127:0]           packer_dout,
   output wire [3:0]             packer_dout_dwen,
   output wire                   packer_valid,
-  output wire                   packer_done
+  output wire                   packer_done,
+
+
+  input wire                    int_valid,
+  input wire [7:0]              int_vector,
+  output wire                   int_done
 );
   //----------------------------------------------------------------------------------------------------------------//
   // PCIe Block EP Tieoffs - Example PIO doesn't support the following inputs                                       //
@@ -211,8 +218,8 @@ module  pcie_app_7x#(
   assign cfg_interrupt_stat = 1'b0;                // Never set the Interrupt Status bit
   assign cfg_pciecap_interrupt_msgnum = 5'b00000;  // Zero out Interrupt Message Number
   assign cfg_interrupt_assert = 1'b0;              // Always drive interrupt de-assert
-  assign cfg_interrupt = 1'b0;                     // Never drive interrupt by qualifying cfg_interrupt_assert
-  assign cfg_interrupt_di = 8'b0;                  // Do not set interrupt fields
+  //assign cfg_interrupt = 1'b0;                     // Never drive interrupt by qualifying cfg_interrupt_assert
+  //assign cfg_interrupt_di = 8'b0;                  // Do not set interrupt fields
 
   assign pl_directed_link_change = 2'b00;          // Never initiate link change
   assign pl_directed_link_width = 2'b00;          // Zero out directed link width
@@ -297,6 +304,20 @@ module  pcie_app_7x#(
     .packer_valid(packer_valid),
     .packer_dout_dwen(packer_dout_dwen),
     .packer_done(packer_done)
+  );
+
+
+  InterruptController InterruptController(
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .cfg_interrupt(cfg_interrupt),
+    .cfg_interrupt_di(cfg_interrupt_di),
+    .cfg_interrupt_rdy(cfg_interrupt_rdy),
+
+    .int_valid(0),
+    .int_vector(8'h1),
+    .int_done(int_done)
   );
 
 endmodule // pcie_app
