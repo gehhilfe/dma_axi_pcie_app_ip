@@ -165,6 +165,18 @@ module  pcie_app_7x#(
   output wire                   dma_read_done,
   output wire [7:0]             current_tag,
 
+
+  // DMA Write Request intf
+  input wire [31:0]             dma_write_addr,
+  input wire [9:0]              dma_write_len,
+  input wire                    dma_write_pending,
+  output wire                   dma_write_done,
+
+  // DMA Write Data Stream intf
+  input wire [127:0]            dma_write_data,
+  input wire                    dma_write_data_valid,
+  output wire                   dma_write_data_ready,
+
   output wire [7:0]             packer_tag,
   output wire [127:0]           packer_dout,
   output wire [3:0]             packer_dout_dwen,
@@ -298,6 +310,17 @@ module  pcie_app_7x#(
     .dma_read_valid(dma_read_valid),
     .dma_read_done(dma_read_done),
     .current_tag(current_tag),
+
+    // DMA Write Request intf
+    .dma_write_addr(dma_write_addr),
+    .dma_write_len(dma_write_len),
+    .dma_write_pending(dma_write_pending),
+    .dma_write_done(dma_write_done),
+
+    // DMA Write Data Stream intf
+    .dma_write_data(dma_write_data),
+    .dma_write_data_valid(dma_write_data_valid),
+    .dma_write_data_ready(dma_write_data_ready),
 
     .packer_tag(packer_tag),
     .packer_dout(packer_dout),

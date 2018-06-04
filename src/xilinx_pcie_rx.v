@@ -35,13 +35,24 @@ module xilinx_pcie_rx #(
     output  reg                     s_axis_tx_tvalid,
     output  wire                    tx_src_dsc,
     
-
     // DMA Read request intf
     input wire [31:0]   dma_read_addr,
     input wire [9:0]    dma_read_len,
     input wire          dma_read_valid,
     output reg          dma_read_done,
     output wire [7:0]   current_tag,
+
+    // DMA Write Request intf
+    input wire [31:0]   dma_write_addr,
+    input wire [9:0]    dma_write_len,
+    input wire          dma_write_pending,
+    output reg          dma_write_done,
+
+    // DMA Write Data Stream intf
+    input wire [127:0]  dma_write_data,
+    input wire          dma_write_data_valid,
+    output wire          dma_write_data_ready,
+
 
     input wire          req_compl,
     input wire          req_compl_wd,
@@ -71,6 +82,7 @@ assign tx_src_dsc = 1'b0;
 localparam PIO_CPLD_FMT_TYPE      = 7'b10_01010;
 localparam PIO_CPL_FMT_TYPE       = 7'b00_01010;
 localparam FMT_TYPE_READ_REQUEST  = 7'b00_00000;
+localparam FMT_TYPE_WRITE_REQUEST = 7'b10_00000;
 
 reg [6:0] lower_addr;
 always @ (rd_be or req_addr or req_compl_wd) begin
@@ -108,14 +120,24 @@ localparam
     lp_state_bits = 32,
     lp_state_idle = 0,
     lp_state_fin = 1,
-    lp_state_wait_ready = 2;
+    lp_state_wait_ready = 2,
+    lp_state_stream_dma_write = 3;
 
 
 reg [lp_state_bits-1:0] state, state_next, state_after_ready, state_after_ready_next;
 
+reg [8:0] r_dma_write_cycles;
+reg [127:0] r_dma_write_scratch;
+
+
 reg set_read_completion_with_data;
 reg set_read_completion_without_data;
 reg set_dma_read_request;
+reg set_dma_write_request;
+reg set_stream_dma_write;
+
+assign dma_write_data_ready = set_dma_write_request || (set_stream_dma_write && r_dma_write_cycles > 1);
+
 reg reset_valid;
 reg [7:0] next_free_tag;
 assign current_tag = next_free_tag;
@@ -125,6 +147,9 @@ always @(*) begin
     state_next = state;
     set_read_completion_with_data = 0;
     set_dma_read_request = 0;
+    set_dma_write_request = 0;
+    set_stream_dma_write = 0;
+
     set_read_completion_without_data = 0;
     reset_valid = 0;
     incr_tag = 0;
@@ -141,6 +166,9 @@ always @(*) begin
                 state_next = lp_state_fin;
                 set_dma_read_request = 1;
                 incr_tag = 1;
+            end else if(dma_write_pending) begin
+                set_dma_write_request = 1;
+                state_next = lp_state_stream_dma_write;
             end
         end
 
@@ -154,6 +182,17 @@ always @(*) begin
         lp_state_wait_ready: begin
             if (s_axis_tx_tready) begin
                 state_next = state_after_ready;
+            end
+        end
+
+        lp_state_stream_dma_write: begin
+            if (s_axis_tx_tready) begin
+                if(r_dma_write_cycles != 0) begin
+                    set_stream_dma_write = 1;    
+                end else begin
+                    reset_valid = 1;
+                    state_next = lp_state_idle;
+                end
             end
         end
     endcase
@@ -207,9 +246,9 @@ function [P_DATA_WIDTH-1:0] tlp_header_read_request;
     input [15:0] completer_id;
     begin
         tlp_header_read_request = {
-                {32'b0},                // 32 // DW 4
+                {32'b0},                // 32 // DW 3
                 
-                addr[31:2],             // 30 // DW 3
+                addr[31:2],             // 30 // DW 2
                 {2'b0},                 //  2
 
                 completer_id,           // 16 // DW 1
@@ -231,6 +270,37 @@ function [P_DATA_WIDTH-1:0] tlp_header_read_request;
     end
 endfunction
 
+function [P_DATA_WIDTH-1:0] tlp_header_write_request;
+    input [31:0] addr;
+    input [9:0] len;
+    input [15:0] completer_id;
+    input [31:0] first_dw;
+    begin
+        tlp_header_write_request = {
+                first_dw,               // 32 // DW 4
+                
+                addr[31:2],             // 30 // DW 3
+                {2'b0},                 //  2
+
+                {16'b0},                // 16 // DW 1
+                8'h0,                   // 8
+                (len==1)?{4'b0}:{4'hf}, //  4
+                {4'hf},                 //  4
+
+                {1'b0},                 //  1 // DW 0
+                FMT_TYPE_WRITE_REQUEST, //  7 //
+                {1'b0},                 //  1 //
+                {3'b0},                 //  3 //
+                {4'b0},                 //  4 //
+                {1'b0},                 //  1 //
+                {1'b0},                 //  1 //
+                {2'b0},                 //  2 //
+                {2'b0},                 //  2 //
+                len                     // 10 //
+        };
+    end
+endfunction
+
 always @(posedge i_clk) begin
     if (i_rst) begin
         state <= lp_state_idle;
@@ -238,12 +308,14 @@ always @(posedge i_clk) begin
         compl_done  <= 0;
         dma_read_done <= 0;
         next_free_tag <= 0;
+        dma_write_done <= 0;
     end
     else begin
         state <= state_next;
         state_after_ready <= state_after_ready_next;
 
         if (incr_tag) next_free_tag <= next_free_tag + 1'b1;
+        if (dma_write_done) dma_write_done <= 0;
 
         if (reset_valid) begin
             s_axis_tx_tvalid  <=  1'b0;
@@ -285,6 +357,30 @@ always @(posedge i_clk) begin
             s_axis_tx_tvalid  <=  1'b1;
             dma_read_done <= 1;
         end // set_dma_read_request
+        else if(set_dma_write_request) begin
+            s_axis_tx_tdata <= tlp_header_write_request (
+                    dma_write_addr,
+                    dma_write_len,
+                    completer_id,
+                    dma_write_data[31:0]
+                );
+            r_dma_write_cycles <= dma_write_len[9:2];
+            r_dma_write_scratch <= dma_write_data;
+            s_axis_tx_tkeep   <=  16'hFFFF;
+            s_axis_tx_tvalid  <=  1'b1;
+            s_axis_tx_tlast <= 0;
+            dma_write_done <= 1;
+        end // set_dma_write_request
+        else if (set_stream_dma_write) begin
+            s_axis_tx_tdata[95:0] <= r_dma_write_scratch[127:32];
+            s_axis_tx_tdata[127:96] <= dma_write_data[31:0];
+            r_dma_write_scratch <= dma_write_data;
+            if(r_dma_write_cycles == 1) begin
+                s_axis_tx_tkeep <= 16'h0FFF;
+                s_axis_tx_tlast <= 1;
+            end
+            r_dma_write_cycles <= r_dma_write_cycles - 1'b1;
+        end
     end
 end
 

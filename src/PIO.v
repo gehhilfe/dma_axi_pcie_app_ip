@@ -114,6 +114,16 @@ module PIO #(
   output wire                   dma_read_done,
   output wire [7:0]             current_tag,
 
+  // DMA Write Request intf
+  input wire [31:0]             dma_write_addr,
+  input wire [9:0]              dma_write_len,
+  input wire                    dma_write_pending,
+  output wire                   dma_write_done,
+
+  // DMA Write Data Stream intf
+  input wire [127:0]            dma_write_data,
+  input wire                    dma_write_data_valid,
+  output wire                   dma_write_data_ready,
 
   output wire [7:0]             packer_tag,
   output wire [127:0]           packer_dout,
@@ -251,6 +261,18 @@ xilinx_pcie_rx xilinx_pcie_completer_inst (
     .completer_id(cfg_completer_id),
     .rd_addr(rd_addr),
     .rd_data(rd_data),
+
+
+    // DMA Write Request intf
+    .dma_write_addr(dma_write_addr),
+    .dma_write_len(dma_write_len),
+    .dma_write_pending(dma_write_pending),
+    .dma_write_done(dma_write_done),
+
+    // DMA Write Data Stream intf
+    .dma_write_data(dma_write_data),
+    .dma_write_data_valid(dma_write_data_valid),
+    .dma_write_data_ready(dma_write_data_ready),
     
     
     .dma_read_addr(dma_read_addr),
