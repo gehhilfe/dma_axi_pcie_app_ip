@@ -291,7 +291,7 @@ module  pcie_app_7x#(
     .m_axis_rx_tlast ( m_axis_rx_tlast ),           // I
     .m_axis_rx_tvalid( m_axis_rx_tvalid ),          // I
     .m_axis_rx_tready( m_axis_rx_tready ),          // O
-    .m_axis_rx_tuser ( m_axis_rx_tuser ),            // I
+    .m_axis_rx_tuser ( m_axis_rx_tuser ),           // I
     
     .rd_addr(rd_addr),
     .rd_be(rd_be),
@@ -338,8 +338,8 @@ module  pcie_app_7x#(
     .cfg_interrupt_di(cfg_interrupt_di),
     .cfg_interrupt_rdy(cfg_interrupt_rdy),
 
-    .int_valid(0),
-    .int_vector(8'h1),
+    .int_valid(int_valid),
+    .int_vector(int_vector),
     .int_done(int_done)
   );
 
