@@ -262,7 +262,6 @@ xilinx_pcie_rx xilinx_pcie_completer_inst (
     .rd_addr(rd_addr),
     .rd_data(rd_data),
 
-
     // DMA Write Request intf
     .dma_write_addr(dma_write_addr),
     .dma_write_len(dma_write_len),

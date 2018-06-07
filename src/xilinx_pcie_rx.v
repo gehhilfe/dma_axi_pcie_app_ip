@@ -51,7 +51,7 @@ module xilinx_pcie_rx #(
     // DMA Write Data Stream intf
     input wire [127:0]  dma_write_data,
     input wire          dma_write_data_valid,
-    output wire          dma_write_data_ready,
+    output wire         dma_write_data_ready,
 
 
     input wire          req_compl,

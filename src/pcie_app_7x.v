@@ -64,7 +64,7 @@
 
 module  pcie_app_7x#(
   parameter C_DATA_WIDTH = 128,            // RX/TX interface data width
-
+  parameter P_PACKER_OUTS = 2,
   // Do not override parameters below this line
   parameter KEEP_WIDTH = C_DATA_WIDTH / 8,              // TSTRB width
   parameter TCQ        = 1
@@ -159,10 +159,17 @@ module  pcie_app_7x#(
   output wire                   wr_en,
   input wire                    wr_done,
 
-  input wire  [31:0]            dma_read_addr,
-  input wire  [9:0]             dma_read_len,
-  input wire                    dma_read_valid,
-  output wire                   dma_read_done,
+  input wire  [31:0]            a_dma_read_addr,
+  input wire  [9:0]             a_dma_read_len,
+  input wire                    a_dma_read_valid,
+  output wire                   a_dma_read_done,
+
+  input wire  [31:0]            b_dma_read_addr,
+  input wire  [9:0]             b_dma_read_len,
+  input wire                    b_dma_read_valid,
+  output wire                   b_dma_read_done,
+
+
   output wire [7:0]             current_tag,
 
 
@@ -177,17 +184,52 @@ module  pcie_app_7x#(
   input wire                    dma_write_data_valid,
   output wire                   dma_write_data_ready,
 
-  output wire [7:0]             packer_tag,
-  output wire [127:0]           packer_dout,
-  output wire [3:0]             packer_dout_dwen,
-  output wire                   packer_valid,
-  output wire                   packer_done,
+  output wire [7:0]             a_packer_tag,
+  output wire [127:0]           a_packer_dout,
+  output wire [3:0]             a_packer_dout_dwen,
+  output wire                   a_packer_valid,
+  output wire                   a_packer_done,
+  
+  output wire [7:0]             b_packer_tag,
+  output wire [127:0]           b_packer_dout,
+  output wire [3:0]             b_packer_dout_dwen,
+  output wire                   b_packer_valid,
+  output wire                   b_packer_done,
 
 
   input wire                    int_valid,
   input wire [7:0]              int_vector,
   output wire                   int_done
 );
+
+  assign b_packer_tag       = a_packer_tag;
+  assign b_packer_dout      = a_packer_dout;
+  assign b_packer_dout_dwen = a_packer_dout_dwen;
+  assign b_packer_valid     = a_packer_valid;
+  assign b_packer_done      = a_packer_done;
+
+  wire [31:0]            dma_read_addr;
+  wire [9:0]             dma_read_len;
+  wire                   dma_read_valid;
+  wire                   dma_read_done;
+
+  dma_read_arbiter #(
+    .p_paths(2)
+  ) dma_read_arbiter (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .ar_dma_read_addr ({a_dma_read_addr, b_dma_read_addr}),
+    .ar_dma_read_len  ({a_dma_read_len, b_dma_read_len}),
+    .ar_dma_read_valid({a_dma_read_valid, b_dma_read_valid}),
+    .ar_dma_done      ({a_dma_read_done, b_dma_read_done}),
+    
+    .dma_read_addr    (dma_read_addr),
+    .dma_read_len     (dma_read_len),
+    .dma_valid        (dma_read_valid),
+    .dma_done         (dma_read_done)
+  );
+
   //----------------------------------------------------------------------------------------------------------------//
   // PCIe Block EP Tieoffs - Example PIO doesn't support the following inputs                                       //
   //----------------------------------------------------------------------------------------------------------------//
@@ -322,11 +364,11 @@ module  pcie_app_7x#(
     .dma_write_data_valid(dma_write_data_valid),
     .dma_write_data_ready(dma_write_data_ready),
 
-    .packer_tag(packer_tag),
-    .packer_dout(packer_dout),
-    .packer_valid(packer_valid),
-    .packer_dout_dwen(packer_dout_dwen),
-    .packer_done(packer_done)
+    .packer_tag(a_packer_tag),
+    .packer_dout(a_packer_dout),
+    .packer_valid(a_packer_valid),
+    .packer_dout_dwen(a_packer_dout_dwen),
+    .packer_done(a_packer_done)
   );
 
 
