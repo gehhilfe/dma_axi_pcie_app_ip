@@ -208,15 +208,20 @@ module  pcie_app_7x#(
   assign b_packer_valid     = a_packer_valid;
   assign b_packer_done      = a_packer_done;
 
-  wire [31:0]            dma_read_addr;
-  wire [9:0]             dma_read_len;
-  wire                   dma_read_valid;
+  wire [31:0]            dma_read_addr = (a_dma_read_valid)?a_dma_read_addr:b_dma_read_addr;
+  wire [9:0]             dma_read_len = (a_dma_read_valid)?a_dma_read_len:b_dma_read_len;
+  wire                   dma_read_valid = a_dma_read_valid | b_dma_read_valid;
   wire                   dma_read_done;
 
+  assign a_dma_read_done = (a_dma_read_valid)?dma_read_done:0;
+  assign b_dma_read_done = (b_dma_read_valid)?dma_read_done:0;
+
+
+  
   dma_read_arbiter #(
     .p_paths(2)
   ) dma_read_arbiter (
-    .i_clk(user_clk),
+/*    .i_clk(user_clk),
     .i_rst(user_reset),
 
     .ar_dma_read_addr ({a_dma_read_addr, b_dma_read_addr}),
@@ -227,7 +232,7 @@ module  pcie_app_7x#(
     .dma_read_addr    (dma_read_addr),
     .dma_read_len     (dma_read_len),
     .dma_valid        (dma_read_valid),
-    .dma_done         (dma_read_done)
+    .dma_done         (dma_read_done)*/
   );
 
   //----------------------------------------------------------------------------------------------------------------//
