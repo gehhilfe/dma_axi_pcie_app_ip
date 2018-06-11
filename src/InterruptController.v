@@ -4,7 +4,7 @@ module InterruptController (
 
     // Interrupt output
     output reg cfg_interrupt,
-    output reg [7:0] cfg_interrupt_di,
+    output wire [7:0] cfg_interrupt_di,
     input wire cfg_interrupt_rdy,
 
     // Interrupt input
@@ -13,6 +13,7 @@ module InterruptController (
     output reg int_done
 );
 
+assign cfg_interrupt_di = 0;
 
 always @(posedge i_clk) begin
 	if (i_rst) begin
@@ -27,7 +28,6 @@ always @(posedge i_clk) begin
 			int_done <= 1;
 		end else if(int_valid) begin
 			cfg_interrupt <= 1;
-			cfg_interrupt_di <= int_vector;
 		end 
 	end
 end
