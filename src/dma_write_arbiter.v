@@ -25,9 +25,9 @@ module dma_write_arbiter #(
 );
 
 
-reg [p_paths-1:0] r_last_path_mask;
-reg [p_paths-1:0] r_active_path;
-reg [8:0] r_dma_write_cycles;
+(* dont_touch = "true" *) reg [p_paths-1:0] r_last_path_mask;
+(* dont_touch = "true" *) reg [p_paths-1:0] r_active_path;
+(* dont_touch = "true" *) reg [7:0] r_dma_write_cycles;
 
 // Output mux
 genvar i;
@@ -64,6 +64,8 @@ endgenerate
 
 wire [p_paths-1:0] paths_ready = ar_dma_write_pending & r_last_path_mask;
 reg [p_paths-1:0] path_sel;
+
+reg r_was_done;
 generate
     for (i=0; i<p_paths; i=i+1) begin
         reg all_null;
@@ -89,20 +91,23 @@ always @(posedge i_clk) begin
 	if (i_rst) begin
 		r_last_path_mask <= {p_paths{1'b1}};
 		r_active_path <= 0;
+		r_dma_write_cycles <= 0;
+		r_was_done <= 0;
 	end else begin
 		if (|paths_ready == 0) r_last_path_mask <= {p_paths{1'b1}};
-		else begin
-			if(r_active_path == 0) begin
-				r_active_path <= path_sel;
-			end else if(dma_write_done) begin
-				r_dma_write_cycles <= dma_write_len[9:2];
-			end else if(r_dma_write_cycles == 0) begin
-				r_last_path_mask <= r_last_path_mask | ~path_sel;
-				r_active_path <= 0;
-			end
+		
+		if(r_active_path == 0) begin
+			r_active_path <= path_sel;
+			r_last_path_mask <= r_last_path_mask & ~path_sel;
+			r_was_done <= 0;
+		end else if(dma_write_done) begin
+			r_dma_write_cycles <= dma_write_len[9:2]-2;
+			r_was_done <= 1;
+		end else if(r_dma_write_cycles == 0 && r_was_done) begin
+			r_active_path <= path_sel;
 		end
 
-		if(dma_write_data_valid && dma_write_data_ready) r_dma_write_cycles <= r_dma_write_cycles - 1'b1;
+		if(r_dma_write_cycles != 0 && dma_write_data_valid && dma_write_data_ready) r_dma_write_cycles <= r_dma_write_cycles - 1'b1;
 	end
 end
 
