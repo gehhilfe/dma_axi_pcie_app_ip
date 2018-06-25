@@ -282,7 +282,7 @@ function [P_DATA_WIDTH-1:0] tlp_header_write_request;
                 addr[31:2],             // 30 // DW 3
                 {2'b0},                 //  2
 
-                {16'b0},                // 16 // DW 1
+                completer_id,           // 16 // DW 1
                 8'h0,                   // 8
                 (len==1)?{4'b0}:{4'hf}, //  4
                 {4'hf},                 //  4
