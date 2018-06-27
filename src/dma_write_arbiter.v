@@ -34,13 +34,13 @@ genvar i;
 integer j;
 generate
 	always @(*) begin
-		dma_write_addr = ar_dma_write_addr[31:0];
-		dma_write_len = ar_dma_write_len[9:0];
-		dma_write_pending = ar_dma_write_pending[0];
+		dma_write_addr = 0;
+		dma_write_len = 0;
+		dma_write_pending = 0;
 		ar_dma_write_done = 0;
 
-		dma_write_data = ar_dma_write_data[127:0];
-		dma_write_data_valid = ar_dma_write_data_valid[0];
+		dma_write_data = 0;
+		dma_write_data_valid = 0;
 		ar_dma_write_data_ready = 0;
 
 		for (j=0; j<p_paths; j=j+1) begin
