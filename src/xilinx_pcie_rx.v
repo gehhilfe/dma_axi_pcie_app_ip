@@ -121,7 +121,8 @@ localparam
     lp_state_idle = 0,
     lp_state_fin = 1,
     lp_state_wait_ready = 2,
-    lp_state_stream_dma_write = 3;
+    lp_state_stream_dma_write = 3,
+    lp_state_compl = 4;
 
 
 reg [lp_state_bits-1:0] state, state_next, state_after_ready, state_after_ready_next;
@@ -143,6 +144,10 @@ reg [7:0] next_free_tag;
 assign current_tag = next_free_tag;
 reg incr_tag;
 
+wire cf_empty;
+reg cf_rd;
+wire cf_req_compl_wd;
+
 always @(*) begin
     state_next = state;
     set_read_completion_with_data = 0;
@@ -153,15 +158,12 @@ always @(*) begin
     set_read_completion_without_data = 0;
     reset_valid = 0;
     incr_tag = 0;
-    
+    cf_rd = 0;
     case(state)
         lp_state_idle: begin
-            if(req_compl) begin
-                state_next = lp_state_fin;
-                if(req_compl_wd)
-                    set_read_completion_with_data = 1;
-                else
-                    set_read_completion_without_data = 1;
+            if(!cf_empty) begin
+                cf_rd = 1;
+                state_next = lp_state_compl;
             end else if(dma_read_valid) begin
                 state_next = lp_state_fin;
                 set_dma_read_request = 1;
@@ -170,6 +172,14 @@ always @(*) begin
                 set_dma_write_request = 1;
                 state_next = lp_state_stream_dma_write;
             end
+        end
+
+        lp_state_compl: begin
+            state_next = lp_state_fin;
+            if(cf_req_compl_wd)
+                set_read_completion_with_data = 1;
+            else
+                set_read_completion_without_data = 1;
         end
 
         lp_state_fin: begin
@@ -197,6 +207,34 @@ always @(*) begin
         end
     endcase
 end
+
+wire [2:0] cf_req_tc; 
+wire cf_req_td;
+wire cf_req_ep; 
+wire [1:0] cf_req_attr;
+wire [9:0] cf_req_len; 
+wire [15:0] cf_completer_id; 
+wire [11:0] cf_byte_count;
+wire [15:0] cf_req_rid;
+wire [7:0] cf_req_tag;
+wire [6:0] cf_lower_addr;
+wire [31:0] cf_rd_data;
+
+fifo #(
+    .BITS_DEPTH(8),
+    .BITS_WIDTH(1+3+1+1+2+10+16+12+16+8+7+32)
+) completion_fifo (
+    .i_clk(i_clk),
+    .i_rst(i_rst),
+
+    .wr_en(req_compl),
+    .din({req_compl_wd, req_tc, req_td, req_ep, req_attr, req_len, completer_id, byte_count, req_rid, req_tag, lower_addr, rd_data}),
+
+    .rd_en(cf_rd),
+    .dout({cf_req_compl_wd, cf_req_tc, cf_req_td, cf_req_ep, cf_req_attr, cf_req_len, cf_completer_id, cf_byte_count, cf_req_rid, cf_req_tag, cf_lower_addr, cf_rd_data}),
+
+    .empty (cf_empty)
+);
 
 function [P_DATA_WIDTH-1:0] tlp_header_completion;
     input [6:0] fmt_type;
@@ -317,6 +355,11 @@ always @(posedge i_clk) begin
         if (incr_tag) next_free_tag <= next_free_tag + 1'b1;
         if (dma_write_done) dma_write_done <= 0;
 
+        if(req_compl)
+            compl_done <= 1;
+        else
+            compl_done <= 0;
+
         if (reset_valid) begin
             s_axis_tx_tvalid  <=  1'b0;
             compl_done <= 0;
@@ -324,17 +367,17 @@ always @(posedge i_clk) begin
         end else if (set_read_completion_with_data || set_read_completion_without_data) begin
             s_axis_tx_tdata <= tlp_header_completion(
                     (set_read_completion_without_data)?PIO_CPL_FMT_TYPE:PIO_CPLD_FMT_TYPE,
-                    req_tc,
-                    req_td,
-                    req_ep,
-                    req_attr,
-                    req_len,
-                    completer_id,
-                    byte_count,
-                    req_rid,
-                    req_tag,
-                    lower_addr,
-                    rd_data
+                    cf_req_tc,
+                    cf_req_td,
+                    cf_req_ep,
+                    cf_req_attr,
+                    cf_req_len,
+                    cf_completer_id,
+                    cf_byte_count,
+                    cf_req_rid,
+                    cf_req_tag,
+                    cf_lower_addr,
+                    cf_rd_data
                 );
 
             if (set_read_completion_with_data)
@@ -344,7 +387,6 @@ always @(posedge i_clk) begin
 
             s_axis_tx_tlast   <=  1'b1;
             s_axis_tx_tvalid  <=  1'b1;
-            compl_done <= 1;
         end // set_read_completion
         else if (set_dma_read_request) begin
             s_axis_tx_tdata <= tlp_header_read_request (
