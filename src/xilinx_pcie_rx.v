@@ -127,6 +127,8 @@ localparam
 
 reg [lp_state_bits-1:0] state, state_next, state_after_ready, state_after_ready_next;
 
+reg r_dma_write_cycles_gt_zero;
+reg r_dma_write_cycles_gt_one;
 reg [8:0] r_dma_write_cycles;
 reg [127:0] r_dma_write_scratch;
 
@@ -137,7 +139,7 @@ reg set_dma_read_request;
 reg set_dma_write_request;
 reg set_stream_dma_write;
 
-assign dma_write_data_ready = set_dma_write_request || (set_stream_dma_write && r_dma_write_cycles > 1);
+assign dma_write_data_ready = set_dma_write_request || (set_stream_dma_write && r_dma_write_cycles_gt_one);
 
 reg reset_valid;
 reg [7:0] next_free_tag;
@@ -197,7 +199,7 @@ always @(*) begin
 
         lp_state_stream_dma_write: begin
             if (s_axis_tx_tready) begin
-                if(r_dma_write_cycles != 0) begin
+                if(r_dma_write_cycles_gt_zero) begin
                     set_stream_dma_write = 1;    
                 end else begin
                     reset_valid = 1;
@@ -221,7 +223,7 @@ wire [6:0] cf_lower_addr;
 wire [31:0] cf_rd_data;
 
 fifo #(
-    .BITS_DEPTH(8),
+    .BITS_DEPTH(3),
     .BITS_WIDTH(1+3+1+1+2+10+16+12+16+8+7+32)
 ) completion_fifo (
     .i_clk(i_clk),
@@ -406,6 +408,8 @@ always @(posedge i_clk) begin
                     completer_id,
                     dma_write_data[31:0]
                 );
+            r_dma_write_cycles_gt_one <= dma_write_len[9:2] > 1;
+            r_dma_write_cycles_gt_zero <= |dma_write_len[9:2];
             r_dma_write_cycles <= dma_write_len[9:2];
             r_dma_write_scratch <= dma_write_data;
             s_axis_tx_tkeep   <=  16'hFFFF;
@@ -421,6 +425,8 @@ always @(posedge i_clk) begin
                 s_axis_tx_tkeep <= 16'h0FFF;
                 s_axis_tx_tlast <= 1;
             end
+            r_dma_write_cycles_gt_zero <= (r_dma_write_cycles - 1'b1) > 0;
+            r_dma_write_cycles_gt_one <= (r_dma_write_cycles - 1'b1) > 1;
             r_dma_write_cycles <= r_dma_write_cycles - 1'b1;
         end
     end

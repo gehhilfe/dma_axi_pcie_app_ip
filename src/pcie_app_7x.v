@@ -174,6 +174,11 @@ module  pcie_app_7x#(
   input wire                    c_dma_read_valid,
   output wire                   c_dma_read_done,
 
+  input wire  [31:0]            d_dma_read_addr,
+  input wire  [9:0]             d_dma_read_len,
+  input wire                    d_dma_read_valid,
+  output wire                   d_dma_read_done,
+
   output wire [7:0]             current_tag,
 
 
@@ -215,6 +220,12 @@ module  pcie_app_7x#(
   output wire [3:0]             c_packer_dout_dwen,
   output wire                   c_packer_valid,
   output wire                   c_packer_done,
+  
+  output wire [7:0]             d_packer_tag,
+  output wire [127:0]           d_packer_dout,
+  output wire [3:0]             d_packer_dout_dwen,
+  output wire                   d_packer_valid,
+  output wire                   d_packer_done,
 
 
   input wire                    int_valid,
@@ -233,6 +244,12 @@ module  pcie_app_7x#(
   assign c_packer_dout_dwen = a_packer_dout_dwen;
   assign c_packer_valid     = a_packer_valid;
   assign c_packer_done      = a_packer_done;  
+  
+  assign d_packer_tag       = a_packer_tag;
+  assign d_packer_dout      = a_packer_dout;
+  assign d_packer_dout_dwen = a_packer_dout_dwen;
+  assign d_packer_valid     = a_packer_valid;
+  assign d_packer_done      = a_packer_done;  
 
   wire [31:0]            dma_read_addr;
   wire [9:0]             dma_read_len;
@@ -242,15 +259,15 @@ module  pcie_app_7x#(
 
   
   dma_read_arbiter #(
-    .p_paths(3)
+    .p_paths(4)
   ) dma_read_arbiter (
     .i_clk(user_clk),
     .i_rst(user_reset),
 
-    .ar_dma_read_addr ({a_dma_read_addr,  b_dma_read_addr,  c_dma_read_addr}),
-    .ar_dma_read_len  ({a_dma_read_len,   b_dma_read_len,   c_dma_read_len}),
-    .ar_dma_read_valid({a_dma_read_valid, b_dma_read_valid, c_dma_read_valid}),
-    .ar_dma_done      ({a_dma_read_done,  b_dma_read_done,  c_dma_read_done}),
+    .ar_dma_read_addr ({a_dma_read_addr,  b_dma_read_addr,  c_dma_read_addr,  d_dma_read_addr}),
+    .ar_dma_read_len  ({a_dma_read_len,   b_dma_read_len,   c_dma_read_len,   d_dma_read_len}),
+    .ar_dma_read_valid({a_dma_read_valid, b_dma_read_valid, c_dma_read_valid, d_dma_read_valid}),
+    .ar_dma_done      ({a_dma_read_done,  b_dma_read_done,  c_dma_read_done,  d_dma_read_done}),
     
     .dma_read_addr    (dma_read_addr),
     .dma_read_len     (dma_read_len),
