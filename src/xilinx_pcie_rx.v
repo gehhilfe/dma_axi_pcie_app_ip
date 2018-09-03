@@ -202,8 +202,13 @@ always @(*) begin
                 if(r_dma_write_cycles_gt_zero) begin
                     set_stream_dma_write = 1;    
                 end else begin
-                    reset_valid = 1;
-                    state_next = lp_state_idle;
+                    if(dma_write_pending && cf_empty) begin
+                        set_dma_write_request = 1;
+                        state_next = lp_state_stream_dma_write;
+                    end else begin
+                        reset_valid = 1;
+                        state_next = lp_state_idle; 
+                    end
                 end
             end
         end
