@@ -264,12 +264,12 @@ always @ ( * ) begin
             m_axis_rx_tready_next = 1'b1;
             if(m_axis_rx_tready && m_axis_rx_tvalid) begin
                 if(req_len == 3 || req_len == 4) begin
-                    m_axis_rx_tready_next = 0;
+                    //m_axis_rx_tready_next = 0;
                     packer_done_next = 1;
                     rx_state_next = lp_state_rst;
                 end
                 else if(req_len == 2 || req_len == 1) begin
-                    m_axis_rx_tready_next = 0;
+                    //m_axis_rx_tready_next = 0;
                     packer_done_next = 1;
                     rx_state_next = lp_state_rst;
                 end

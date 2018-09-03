@@ -168,8 +168,6 @@ wire [7:0]      req_be;
 wire [31:0]     req_addr;
 
 
-assign packer_tag = req_tag;
-
 // Packer
 wire [127:0]  packer_ep_dout;
 wire [1:0]    packer_first_dw;
@@ -226,11 +224,13 @@ packer dma_completion_packer (
     .first_dw(packer_first_dw),
     .valid(packer_ep_valid),
     .done(packer_ep_done),
+    .tag(req_tag),
 
     .dout(packer_dout),
     .dout_valid(packer_valid),
     .dout_dwen(packer_dout_dwen),
-    .dout_done(packer_done)
+    .dout_done(packer_done),
+    .dout_tag(packer_tag)
   );
 
 xilinx_pcie_rx xilinx_pcie_completer_inst (

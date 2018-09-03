@@ -4,13 +4,15 @@ module packer (
 
     input wire [127:0] din,
     input wire [1:0] first_dw,
+    input wire [7:0] tag,
     input wire valid,
     input wire done,
 
     output reg [127:0] dout,
     output reg dout_valid,
     output reg [3:0] dout_dwen,
-    output wire dout_done
+    output wire dout_done,
+    output reg [7:0] dout_tag
 );
 
 
@@ -20,6 +22,7 @@ reg [127:0] scratch;
 reg reset_data_out;
 reg need_rem;
 reg [1:0] rem_dw;
+reg [7:0] r_tag;
 
 assign dout_done = reset_data_out;
 
@@ -48,9 +51,11 @@ always @(posedge i_clk) begin
 
         if (valid && first_valid_after_done) begin
             start_first_dw <= first_dw;
+            r_tag <= tag;
             case(first_dw)
                 2'b00: begin
                     dout <= din;
+                    dout_tag <= tag;
                     dout_valid <= 1;
                     dout_dwen <= 4'hF;
                 end // 2'b00:
@@ -70,6 +75,7 @@ always @(posedge i_clk) begin
         end 
         else if(valid && !first_valid_after_done && !done) begin
             dout_valid <= 1;
+            dout_tag <= r_tag;
             dout_dwen <= 4'hF;
             case(start_first_dw)
                 2'b00: dout <= din;
@@ -92,6 +98,7 @@ always @(posedge i_clk) begin
 
         end else if (valid && done) begin
             rem_dw <= first_dw;
+            dout_tag <= r_tag;
             case({start_first_dw, first_dw})
                 4'b0000: begin
                     dout <= din;
