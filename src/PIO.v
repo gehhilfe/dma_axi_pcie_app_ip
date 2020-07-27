@@ -94,15 +94,54 @@ module PIO #(
   input                         cfg_to_turnoff,
   output                        cfg_turnoff_ok,
 
-  input [15:0]                  cfg_completer_id
+  input [15:0]                  cfg_completer_id,
 
+  output wire                   rd_en,
+  input wire                    rd_done,
+  output wire [31:0]            rd_addr,
+  output wire [7:0]             rd_be,
+  input wire [31:0]             rd_data,
+
+  output wire                   wr_en,
+  input wire                    wr_done,
+  output wire [31:0]            wr_addr,
+  output wire [7:0]             wr_be,
+  output wire [31:0]            wr_data,
+
+  input wire  [31:0]            dma_read_addr,
+  input wire  [9:0]             dma_read_len,
+  input wire                    dma_read_valid,
+  output wire                   dma_read_done,
+  output wire [7:0]             current_tag,
+
+  // DMA Write Request intf
+  input wire [31:0]             dma_write_addr,
+  input wire [9:0]              dma_write_len,
+  input wire                    dma_write_pending,
+  output wire                   dma_write_done,
+
+  // DMA Write Data Stream intf
+  input wire [127:0]            dma_write_data,
+  input wire                    dma_write_data_valid,
+  output wire                   dma_write_data_ready,
+
+  output wire [7:0]             packer_tag,
+  output wire [127:0]           packer_dout,
+  output wire [3:0]             packer_dout_dwen,
+  output wire                   packer_valid,
+  output wire                   packer_done
 ); // synthesis syn_hier = "hard"
 
   // Local wires
-
   wire          req_compl;
+  wire          req_compl_wd;
   wire          compl_done;
   reg           pio_reset_n;
+
+
+  assign rd_be = 8'h0F;
+  assign rd_en = req_compl;
+
 
   always @(posedge user_clk) begin
     if (user_reset)
@@ -112,41 +151,135 @@ module PIO #(
   end
 
 
-  `include "xilinx_pcie_ep_init.vh"
+// File: xilinx_pcie_ep_init.vh
+// Name: Tim Burkert
+// Email: burkert.tim@gmail.com
+// Date: 16.4.18
+// Desc: Instantiate a xilinx_pcie_ep used for VPCIE testbench
 
-  //
-  // PIO instance
-  //
-/*
-  PIO_EP  #(
-    .C_DATA_WIDTH( C_DATA_WIDTH ),
-    .KEEP_WIDTH( KEEP_WIDTH ),
-    .TCQ( TCQ )
-  ) PIO_EP_inst (
+wire [2:0]      req_tc;
+wire            req_td;
+wire            req_ep;
+wire [1:0]      req_attr;
+wire [9:0]      req_len;
+wire [15:0]     req_rid;
+wire [7:0]      req_tag;
+wire [7:0]      req_be;
+wire [31:0]     req_addr;
 
-    .clk( user_clk ),                             // I
-    .rst_n( pio_reset_n ),                        // I
 
-    .s_axis_tx_tready( s_axis_tx_tready ),        // I
-    .s_axis_tx_tdata( s_axis_tx_tdata ),          // O
-    .s_axis_tx_tkeep( s_axis_tx_tkeep ),          // O
-    .s_axis_tx_tlast( s_axis_tx_tlast ),          // O
-    .s_axis_tx_tvalid( s_axis_tx_tvalid ),        // O
-    .tx_src_dsc( tx_src_dsc ),                    // O
+// Packer
+wire [127:0]  packer_ep_dout;
+wire [1:0]    packer_first_dw;
+wire          packer_ep_valid;
+wire          packer_ep_done;
 
-    .m_axis_rx_tdata( m_axis_rx_tdata ),          // I
-    .m_axis_rx_tkeep( m_axis_rx_tkeep ),          // I
-    .m_axis_rx_tlast( m_axis_rx_tlast ),          // I
-    .m_axis_rx_tvalid( m_axis_rx_tvalid ),        // I
-    .m_axis_rx_tready( m_axis_rx_tready ),        // O
-    .m_axis_rx_tuser ( m_axis_rx_tuser ),         // I
+xilinx_pcie_ep xilinx_pcie_ep_inst (
+    .i_clk(user_clk),
+    .i_rst_n(user_reset),
 
-    .req_compl(req_compl),                        // O
-    .compl_done(compl_done),                      // O
+    //.cfg_max_read_request_size(cfg_dcommand[14:12]),
+    //.cfg_max_payload_size(cfg_dcommand[7:5]),
 
-    .cfg_completer_id ( cfg_completer_id )        // I [15:0]
+    .m_axis_rx_tlast(m_axis_rx_tlast),
+    .m_axis_rx_tdata(m_axis_rx_tdata),
+    .m_axis_rx_tuser(m_axis_rx_tuser),
+    .m_axis_rx_tvalid(m_axis_rx_tvalid),
+    .m_axis_rx_tready(m_axis_rx_tready),
+
+    .req_tc(req_tc),
+    .req_td(req_td),
+    .req_ep(req_ep),
+    .req_attr(req_attr),
+    .req_len(req_len),
+    .req_rid(req_rid),
+    .req_tag(req_tag),
+    .req_be(req_be),
+    .req_addr(req_addr),
+
+    .req_compl(req_compl),
+    .req_compl_wd(req_compl_wd),
+
+    .compl_done(rd_done),
+    .wr_done(wr_done),
+
+    .wr_addr(wr_addr),
+    .wr_be(wr_be),
+    .wr_data(wr_data),
+    .wr_en(wr_en),
+
+    // Packer
+    .packer_dout(packer_ep_dout),
+    .packer_first_dw(packer_first_dw),
+    .packer_valid(packer_ep_valid),
+    .packer_done(packer_ep_done)
+
+    );
+
+packer dma_completion_packer (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .din(packer_ep_dout),
+    .first_dw(packer_first_dw),
+    .valid(packer_ep_valid),
+    .done(packer_ep_done),
+    .tag(req_tag),
+
+    .dout(packer_dout),
+    .dout_valid(packer_valid),
+    .dout_dwen(packer_dout_dwen),
+    .dout_done(packer_done),
+    .dout_tag(packer_tag)
   );
-*/
+
+xilinx_pcie_rx xilinx_pcie_completer_inst (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .s_axis_tx_tready(s_axis_tx_tready),
+    .s_axis_tx_tdata(s_axis_tx_tdata),
+    .s_axis_tx_tkeep(s_axis_tx_tkeep),
+    .s_axis_tx_tlast(s_axis_tx_tlast),
+    .s_axis_tx_tvalid(s_axis_tx_tvalid),
+    .tx_src_dsc(tx_src_dsc),
+
+    .req_compl(rd_done),
+    .req_compl_wd(rd_done),
+    .compl_done(compl_done),
+
+    .req_tc(req_tc),
+    .req_td(req_td),
+    .req_ep(req_ep),
+    .req_attr(req_attr),
+    .req_len(req_len),
+    .req_rid(req_rid),
+    .req_tag(req_tag),
+    .req_be(req_be),
+    .req_addr(req_addr),
+
+    .completer_id(cfg_completer_id),
+    .rd_addr(rd_addr),
+    .rd_data(rd_data),
+
+    // DMA Write Request intf
+    .dma_write_addr(dma_write_addr),
+    .dma_write_len(dma_write_len),
+    .dma_write_pending(dma_write_pending),
+    .dma_write_done(dma_write_done),
+
+    // DMA Write Data Stream intf
+    .dma_write_data(dma_write_data),
+    .dma_write_data_valid(dma_write_data_valid),
+    .dma_write_data_ready(dma_write_data_ready),
+    
+    
+    .dma_read_addr(dma_read_addr),
+    .dma_read_len(dma_read_len),
+    .dma_read_valid(dma_read_valid),
+    .dma_read_done(dma_read_done),
+    .current_tag(current_tag)
+);
 
   //
   // Turn-Off controller
@@ -158,7 +291,7 @@ module PIO #(
     .clk( user_clk ),                       // I
     .rst_n( pio_reset_n ),                  // I
 
-    .req_compl( req_compl ),                // I
+    .req_compl( rd_done ),                // I
     .compl_done( compl_done ),              // I
 
     .cfg_to_turnoff( cfg_to_turnoff ),      // I

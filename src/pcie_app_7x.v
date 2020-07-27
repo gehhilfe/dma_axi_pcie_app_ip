@@ -64,7 +64,7 @@
 
 module  pcie_app_7x#(
   parameter C_DATA_WIDTH = 128,            // RX/TX interface data width
-
+  parameter P_PACKER_OUTS = 2,
   // Do not override parameters below this line
   parameter KEEP_WIDTH = C_DATA_WIDTH / 8,              // TSTRB width
   parameter TCQ        = 1
@@ -94,6 +94,8 @@ module  pcie_app_7x#(
   input   [7:0]                 cfg_bus_number,
   input   [4:0]                 cfg_device_number,
   input   [2:0]                 cfg_function_number,
+  input                         cfg_interrupt_rdy,
+
   output                        tx_cfg_gnt,
   output                        cfg_pm_halt_aspm_l0s,
   output                        cfg_pm_halt_aspm_l1,
@@ -142,8 +144,171 @@ module  pcie_app_7x#(
   output                        cfg_interrupt_assert,
   output [7:0]                  cfg_interrupt_di,
   output                        cfg_interrupt_stat,
-  output  [4:0]                 cfg_pciecap_interrupt_msgnum
+  output  [4:0]                 cfg_pciecap_interrupt_msgnum,
+  
+  
+  output wire [31:0]            rd_addr,
+  output wire [7:0]             rd_be,
+  input wire [31:0]             rd_data,
+  output wire                   rd_en,
+  input wire                    rd_done,
+  
+  output wire [31:0]            wr_addr,
+  output wire [7:0]             wr_be,
+  output wire [31:0]            wr_data,
+  output wire                   wr_en,
+  input wire                    wr_done,
+
+  input wire  [31:0]            a_dma_read_addr,
+  input wire  [9:0]             a_dma_read_len,
+  input wire                    a_dma_read_valid,
+  output wire                   a_dma_read_done,
+
+  input wire  [31:0]            b_dma_read_addr,
+  input wire  [9:0]             b_dma_read_len,
+  input wire                    b_dma_read_valid,
+  output wire                   b_dma_read_done,
+
+  input wire  [31:0]            c_dma_read_addr,
+  input wire  [9:0]             c_dma_read_len,
+  input wire                    c_dma_read_valid,
+  output wire                   c_dma_read_done,
+
+  input wire  [31:0]            d_dma_read_addr,
+  input wire  [9:0]             d_dma_read_len,
+  input wire                    d_dma_read_valid,
+  output wire                   d_dma_read_done,
+
+  output wire [7:0]             current_tag,
+
+
+  // DMA Write Request intf
+  input wire [31:0]             a_dma_write_addr,
+  input wire [9:0]              a_dma_write_len,
+  input wire                    a_dma_write_pending,
+  output wire                   a_dma_write_done,
+
+  input wire [127:0]            a_dma_write_data,
+  input wire                    a_dma_write_data_valid,
+  output wire                   a_dma_write_data_ready,
+
+  input wire [31:0]             b_dma_write_addr,
+  input wire [9:0]              b_dma_write_len,
+  input wire                    b_dma_write_pending,
+  output wire                   b_dma_write_done,
+
+  input wire [127:0]            b_dma_write_data,
+  input wire                    b_dma_write_data_valid,
+  output wire                   b_dma_write_data_ready,
+
+
+  // DMA Packer
+  output wire [7:0]             a_packer_tag,
+  output wire [127:0]           a_packer_dout,
+  output wire [3:0]             a_packer_dout_dwen,
+  output wire                   a_packer_valid,
+  output wire                   a_packer_done,
+  
+  output wire [7:0]             b_packer_tag,
+  output wire [127:0]           b_packer_dout,
+  output wire [3:0]             b_packer_dout_dwen,
+  output wire                   b_packer_valid,
+  output wire                   b_packer_done,
+
+  output wire [7:0]             c_packer_tag,
+  output wire [127:0]           c_packer_dout,
+  output wire [3:0]             c_packer_dout_dwen,
+  output wire                   c_packer_valid,
+  output wire                   c_packer_done,
+  
+  output wire [7:0]             d_packer_tag,
+  output wire [127:0]           d_packer_dout,
+  output wire [3:0]             d_packer_dout_dwen,
+  output wire                   d_packer_valid,
+  output wire                   d_packer_done,
+
+
+  input wire                    int_valid,
+  input wire [7:0]              int_vector,
+  output wire                   int_done
 );
+
+  assign b_packer_tag       = a_packer_tag;
+  assign b_packer_dout      = a_packer_dout;
+  assign b_packer_dout_dwen = a_packer_dout_dwen;
+  assign b_packer_valid     = a_packer_valid;
+  assign b_packer_done      = a_packer_done;
+
+  assign c_packer_tag       = a_packer_tag;
+  assign c_packer_dout      = a_packer_dout;
+  assign c_packer_dout_dwen = a_packer_dout_dwen;
+  assign c_packer_valid     = a_packer_valid;
+  assign c_packer_done      = a_packer_done;  
+  
+  assign d_packer_tag       = a_packer_tag;
+  assign d_packer_dout      = a_packer_dout;
+  assign d_packer_dout_dwen = a_packer_dout_dwen;
+  assign d_packer_valid     = a_packer_valid;
+  assign d_packer_done      = a_packer_done;  
+
+  wire [31:0]            dma_read_addr;
+  wire [9:0]             dma_read_len;
+  wire                   dma_read_valid;
+  wire                   dma_read_done;
+
+
+  
+  dma_read_arbiter #(
+    .p_paths(4)
+  ) dma_read_arbiter (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .ar_dma_read_addr ({a_dma_read_addr,  b_dma_read_addr,  c_dma_read_addr,  d_dma_read_addr}),
+    .ar_dma_read_len  ({a_dma_read_len,   b_dma_read_len,   c_dma_read_len,   d_dma_read_len}),
+    .ar_dma_read_valid({a_dma_read_valid, b_dma_read_valid, c_dma_read_valid, d_dma_read_valid}),
+    .ar_dma_done      ({a_dma_read_done,  b_dma_read_done,  c_dma_read_done,  d_dma_read_done}),
+    
+    .dma_read_addr    (dma_read_addr),
+    .dma_read_len     (dma_read_len),
+    .dma_valid        (dma_read_valid),
+    .dma_done         (dma_read_done)
+  );
+
+  wire [31:0]            dma_write_addr;
+  wire [9:0]             dma_write_len;
+  wire                   dma_write_pending;
+  wire                   dma_write_done;
+
+  wire [127:0]           dma_write_data;
+  wire                   dma_write_data_valid;
+  wire                   dma_write_data_ready;
+
+  dma_write_arbiter #(
+    .p_paths(2)
+  ) dma_write_arbiter (
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .ar_dma_write_addr   ({a_dma_write_addr,    b_dma_write_addr}),
+    .ar_dma_write_len    ({a_dma_write_len,     b_dma_write_len}),
+    .ar_dma_write_pending({a_dma_write_pending, b_dma_write_pending}),
+    .ar_dma_write_done   ({a_dma_write_done,    b_dma_write_done}),
+
+    .ar_dma_write_data      ({a_dma_write_data,       b_dma_write_data}),
+    .ar_dma_write_data_valid({a_dma_write_data_valid, b_dma_write_data_valid}),
+    .ar_dma_write_data_ready({a_dma_write_data_ready, b_dma_write_data_ready}),
+
+    .dma_write_addr(dma_write_addr),
+    .dma_write_len(dma_write_len),
+    .dma_write_pending(dma_write_pending),
+    .dma_write_done(dma_write_done),
+
+    .dma_write_data_valid(dma_write_data_valid),
+    .dma_write_data(dma_write_data),
+    .dma_write_data_ready(dma_write_data_ready)
+  );
+
   //----------------------------------------------------------------------------------------------------------------//
   // PCIe Block EP Tieoffs - Example PIO doesn't support the following inputs                                       //
   //----------------------------------------------------------------------------------------------------------------//
@@ -186,8 +351,8 @@ module  pcie_app_7x#(
   assign cfg_interrupt_stat = 1'b0;                // Never set the Interrupt Status bit
   assign cfg_pciecap_interrupt_msgnum = 5'b00000;  // Zero out Interrupt Message Number
   assign cfg_interrupt_assert = 1'b0;              // Always drive interrupt de-assert
-  assign cfg_interrupt = 1'b0;                     // Never drive interrupt by qualifying cfg_interrupt_assert
-  assign cfg_interrupt_di = 8'b0;                  // Do not set interrupt fields
+  //assign cfg_interrupt = 1'b0;                     // Never drive interrupt by qualifying cfg_interrupt_assert
+  //assign cfg_interrupt_di = 8'b0;                  // Do not set interrupt fields
 
   assign pl_directed_link_change = 2'b00;          // Never initiate link change
   assign pl_directed_link_width = 2'b00;          // Zero out directed link width
@@ -247,8 +412,56 @@ module  pcie_app_7x#(
     .m_axis_rx_tlast ( m_axis_rx_tlast ),           // I
     .m_axis_rx_tvalid( m_axis_rx_tvalid ),          // I
     .m_axis_rx_tready( m_axis_rx_tready ),          // O
-    .m_axis_rx_tuser ( m_axis_rx_tuser )            // I
+    .m_axis_rx_tuser ( m_axis_rx_tuser ),           // I
+    
+    .rd_addr(rd_addr),
+    .rd_be(rd_be),
+    .rd_data(rd_data),
+    .rd_en(rd_en),
+    .rd_done(rd_done),
+    
+    .wr_addr(wr_addr),
+    .wr_be(wr_be),
+    .wr_data(wr_data),
+    .wr_en(wr_en),
+    .wr_done(wr_done),
 
+    .dma_read_addr(dma_read_addr),
+    .dma_read_len(dma_read_len),
+    .dma_read_valid(dma_read_valid),
+    .dma_read_done(dma_read_done),
+    .current_tag(current_tag),
+
+    // DMA Write Request intf
+    .dma_write_addr(dma_write_addr),
+    .dma_write_len(dma_write_len),
+    .dma_write_pending(dma_write_pending),
+    .dma_write_done(dma_write_done),
+
+    // DMA Write Data Stream intf
+    .dma_write_data(dma_write_data),
+    .dma_write_data_valid(dma_write_data_valid),
+    .dma_write_data_ready(dma_write_data_ready),
+
+    .packer_tag(a_packer_tag),
+    .packer_dout(a_packer_dout),
+    .packer_valid(a_packer_valid),
+    .packer_dout_dwen(a_packer_dout_dwen),
+    .packer_done(a_packer_done)
+  );
+
+
+  InterruptController InterruptController(
+    .i_clk(user_clk),
+    .i_rst(user_reset),
+
+    .cfg_interrupt(cfg_interrupt),
+    .cfg_interrupt_di(cfg_interrupt_di),
+    .cfg_interrupt_rdy(cfg_interrupt_rdy),
+
+    .int_valid(int_valid),
+    .int_vector(int_vector),
+    .int_done(int_done)
   );
 
 endmodule // pcie_app

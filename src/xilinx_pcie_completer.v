@@ -22,7 +22,6 @@ module xilinx_pcie_completer #(
     output  reg                     s_axis_tx_tvalid,
     output  wire                    tx_src_dsc,
 
-
     input wire          req_compl,
     input wire          req_compl_wd,
     output reg          compl_done,
@@ -35,9 +34,9 @@ module xilinx_pcie_completer #(
     input wire [15:0]   req_rid,
     input wire [7:0]    req_tag,
     input wire [7:0]    req_be,
-    input wire [12:0]   req_addr,
+    input wire [31:0]   req_addr,
 
-    output wire [10:0]  rd_addr,
+    output wire [31:0]  rd_addr,
     output reg [3:0]    rd_be,
     input wire [31:0]   rd_data,
     input wire [15:0]   completer_id
@@ -51,7 +50,7 @@ localparam PIO_TX_CPLD_QW1_FIRST  = 2'b01;
 localparam PIO_TX_CPLD_QW1_TEMP   = 2'b10;
 localparam PIO_TX_CPLD_QW1        = 2'b11;
 
-assign rd_addr = req_addr[12:2];
+assign rd_addr = req_addr[31:0];
 
 // Unused discontinue
 assign tx_src_dsc = 1'b0;
@@ -87,11 +86,13 @@ always @(posedge i_clk) begin
 reg [6:0] lower_addr;
 reg hold_state;
 reg req_compl_q;
+reg [31:0] rd_data_q;
 reg req_compl_wd_q;
 reg req_compl_q2;
+reg [31:0] rd_data_q2;
 reg req_compl_wd_q2;
 
-assign compl_wd = req_compl_wd_q2;
+wire compl_wd = req_compl_wd_q2;
 
 always @ (rd_be or req_addr or compl_wd) begin
         casex ({compl_wd, rd_be[3:0]})
@@ -113,6 +114,7 @@ always @ ( posedge i_clk ) begin
   end // if !rst_n
   else
   begin
+    rd_data_q <= rd_data;
     req_compl_q      <= req_compl;
     req_compl_wd_q   <= req_compl_wd;
   end // if rst_n
@@ -126,6 +128,7 @@ always @ ( posedge i_clk ) begin
   end // if (!rst_n )
   else
   begin
+    rd_data_q2 <= rd_data_q;
     req_compl_q2      <=  req_compl_q;
     req_compl_wd_q2   <=  req_compl_wd_q;
   end // if (rst_n )
@@ -145,7 +148,7 @@ always @ ( posedge i_clk ) begin
                         s_axis_tx_tlast   <=  1'b1;
                         s_axis_tx_tvalid  <=  1'b1;
                         s_axis_tx_tdata   <=  {                   // Bits
-                                            rd_data,                  // 32
+                                            rd_data_q2,                  // 32
                                             req_rid,                  // 16
                                             req_tag,                  //  8
                                             {1'b0},                   //  1
